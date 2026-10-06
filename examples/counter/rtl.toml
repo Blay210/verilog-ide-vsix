@@ -1,0 +1,20 @@
+version = 1
+[project]
+name = "counter"
+[sources]
+rtl = ["rtl/**/*.sv"]
+[simulation]
+backend = "verilator"
+timing = true
+waveform = "vcd"
+timeout_ms = 60000
+[[test]]
+name = "counter_basic"
+tags = ["smoke", "basic"]
+top = "counter_basic_tb"
+sources = ["tb/counter_basic_tb.sv"]
+[[test]]
+name = "counter_reset"
+tags = ["smoke", "reset"]
+top = "counter_reset_tb"
+sources = ["tb/counter_reset_tb.sv"]

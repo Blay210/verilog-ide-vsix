@@ -1,0 +1,97 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { mkdir, mkdtemp, writeFile, readFile, readdir } from 'node:fs/promises';
+import { loadProject } from '../../packages/core/src/config';
+import { SlangProvider, connectionPort, connectionRank, parameterSignature, portSignature, portCompletions, symbolAt } from '../../packages/semantic/src/index';
+
+const python = process.env.RTL_SEMANTIC_PYTHON;
+test('real slang: source configuration, unsaved buffers, signatures, queries and cleanup', { skip: !python }, async () => {
+  await mkdir('.dev/tests', { recursive: true });
+  const root = await mkdtemp(path.resolve('.dev/tests/semantic 한글 '));
+  await mkdir(path.join(root, 'rtl')); await mkdir(path.join(root, 'include'));
+  const manifest = `version=1\n[project]\nname="semantic"\n[sources]\npackages=["rtl/pkg.sv"]\nrtl=["rtl/dut.sv", "rtl/top.sv", "rtl/legacy.v"]\ninclude_dirs=["include"]\n[sources.defines]\nEXTRA=1\n`;
+  const dut = '`include "width.svh"\nmodule dut #(parameter W=`WIDTH, parameter type T=logic)(input logic [W-1:0] data, output pkg::word_t result\n`ifdef EXTRA\n, input logic enable\n`endif\n); endmodule\n';
+  const top = 'module top; dut #(.W(9)) u(.data(), .result(), .enable()); endmodule\n';
+  const file = path.join(root, 'rtl/dut.sv'), topFile = path.join(root, 'rtl/top.sv'), header = path.join(root, 'include/width.svh');
+  await Promise.all([writeFile(path.join(root, 'rtl.toml'), manifest), writeFile(file, dut), writeFile(topFile, top), writeFile(header, '`define WIDTH 4\n'), writeFile(path.join(root, 'rtl/pkg.sv'), 'package pkg; typedef logic [5:0] word_t; endpackage\n'), writeFile(path.join(root, 'rtl/legacy.v'), 'module legacy(a, z); input [2:0] a; output z; endmodule\n')]);
+  const project = await loadProject(root), cache = await mkdtemp(path.resolve('.dev/tests/semantic-cache-'));
+  const provider = new SlangProvider(python!, path.resolve('packages/semantic/python/analyze.py'), cache);
+  const first = await provider.analyze(project, []);
+  assert.deepEqual(first.modules.map(m => m.name).sort(), ['dut', 'legacy', 'top']);
+  assert.equal(first.modules.find(m => m.name === 'dut')!.ports[0].type, 'logic[3:0]');
+  assert.equal(first.instances.find(i => i.name === 'u')!.ports[0].type, 'logic[8:0]');
+  assert.equal(first.modules.find(m => m.name === 'legacy')!.ports[0].type, 'logic[2:0]');
+  assert.equal(first.diagnostics.filter(d => d.severity === 'error').length, 0, JSON.stringify(first.diagnostics));
+  const help = portSignature(first, topFile, top, top.indexOf('.data(') + '.data('.length);
+  assert.match(help!.label, /logic\[8:0\] data/);
+  assert.equal(help!.activeParameter, 0);
+  assert.equal(portSignature(first, topFile, top, top.indexOf('.W(') + '.W('.length), undefined);
+  const parameterHelp = parameterSignature(first, topFile, top, top.indexOf('.W(') + '.W('.length);
+  assert.equal(parameterHelp?.activeParameter, 0);
+  assert.match(parameterHelp!.label, /W = 4/);
+  assert.match(parameterHelp!.label, /type T = logic/);
+  for (const connection of ['#(.W(9), .T(logic))', '#(9, logic)']) {
+    const editing = top.replace('#(.W(9))', connection);
+    const result = await provider.analyze(project, [{file: topFile, text: editing}]);
+    const at = editing.indexOf('logic') + 2;
+    assert.equal(parameterSignature(result, topFile, editing, at)?.activeParameter, 1);
+  }
+  const connectionText = top.replace('module top;', 'module top; logic [8:0] data; logic [3:0] short_data; logic signed [8:0] signed_data; bit [8:0] two_state_data; typedef enum logic [8:0] {IDLE, BUSY} state_t; state_t state_data; union packed {logic [8:0] a; logic [8:0] b;} union_data;');
+  const connectionOffset = connectionText.indexOf('.data(') + '.data('.length;
+  const connectionAnalysis = await provider.analyze(project, [{file:topFile,text:connectionText}]);
+  const expectedPort = connectionPort(connectionAnalysis,topFile,connectionText,connectionOffset)!;
+  assert.equal(expectedPort.signalType?.width,9);
+  const symbols = await provider.complete(project,[{file:topFile,text:connectionText}],{file:topFile,offset:connectionOffset});
+  const rank = (name:string) => connectionRank(expectedPort,symbols.find(s=>s.name===name)!);
+  assert.ok(rank('data').sortText < rank('signed_data').sortText);
+  assert.ok(rank('signed_data').sortText < rank('short_data').sortText);
+  assert.ok(rank('data').sortText < rank('two_state_data').sortText);
+  assert.equal(rank('state_data').reason,undefined);
+  assert.equal(rank('union_data').reason,undefined);
+  const changedDut = dut.replace('input logic enable', 'input logic fresh');
+  const changedTop = top.replace('.enable()', '.fr');
+  const next = await provider.analyze(project, [{ file, text: changedDut }, { file: topFile, text: changedTop }, { file: header, text: '`define WIDTH 7\n' }]);
+  assert.equal(next.modules.find(m => m.name === 'dut')!.ports[0].type, 'logic[6:0]');
+  for (const connection of ['.data, .result(), . ', '.data(), .result, . fr', '.*, . fr']) {
+    const editing = `module top; logic [8:0] data; dut #(.W(9)) u(${connection}); endmodule\n`;
+    const cursor = editing.indexOf(');');
+    const result = await provider.analyze(project, [{ file, text: changedDut }, { file: topFile, text: editing }]);
+    assert.deepEqual(portCompletions(result, topFile, editing, cursor).ports.map(p => p.name), ['fresh'], connection);
+    assert.deepEqual(portCompletions(result, topFile, editing, editing.indexOf('.W') + 2).ports, [], 'parameter names are not port names');
+  }
+  const offset = changedTop.indexOf('.fr') + 3;
+  assert.deepEqual(portCompletions(next, topFile, changedTop, offset).ports.map(p => p.name), ['fresh']);
+  assert.equal(symbolAt(next, file, changedDut, changedDut.indexOf('fresh') + 2)?.location.file.toLowerCase(), file.toLowerCase());
+  assert.equal(symbolAt(next, topFile, changedTop, changedTop.indexOf('dut') + 1)?.label, 'module dut');
+  const broken = '// 한글 😀\r\nmodule top; initial begin $display(missing_symbol); end endmodule\r\n';
+  const diagnosticResult = await provider.analyze(project, [{ file: topFile, text: broken }]);
+  const diagnostic = diagnosticResult.diagnostics.find(d => d.message.includes('missing_symbol'))!;
+  assert.ok(diagnostic); assert.equal(diagnostic.location.offset, broken.indexOf('missing_symbol'));
+  assert.equal(diagnostic.location.line, 1); assert.equal(diagnostic.severity, 'error');
+  assert.equal(await readFile(file, 'utf8'), dut); assert.equal(await readFile(header, 'utf8'), '`define WIDTH 4\n');
+  assert.deepEqual(await readdir(cache), []);
+  const abort = new AbortController(); abort.abort();
+  await assert.rejects(provider.analyze(project, [], abort.signal));
+  assert.deepEqual(await readdir(cache), []);
+});
+
+test('real slang isolates testbench compilations and clears obsolete diagnostics', { skip: !python }, async () => {
+  await mkdir('.dev/tests', { recursive: true });
+  const root = await mkdtemp(path.resolve('.dev/tests/semantic-isolation-'));
+  await mkdir(path.join(root, 'rtl')); await mkdir(path.join(root, 'tb'));
+  await writeFile(path.join(root, 'rtl.toml'), 'version=1\n[project]\nname="isolation"\n[[test]]\nname="a"\ntop="bench"\nsources=["tb/a.sv"]\n[[test]]\nname="b"\ntop="bench"\nsources=["tb/b.sv"]\n');
+  await writeFile(path.join(root, 'rtl/dut.sv'), 'module dut(input logic a); endmodule\n');
+  const source = 'module bench; dut u(.a()); endmodule\n';
+  await writeFile(path.join(root, 'tb/a.sv'), source); await writeFile(path.join(root, 'tb/b.sv'), source);
+  const provider = new SlangProvider(python!, path.resolve('packages/semantic/python/analyze.py'), path.resolve('.dev/tests/semantic-shared-cache'));
+  const project = await loadProject(root);
+  const result = await provider.analyze(project, []);
+  assert.equal(result.instances.length, 2);
+  assert.deepEqual(result.diagnostics.filter(d => d.severity === 'error'), []);
+  const file = path.join(root, 'tb/a.sv');
+  const bad = await provider.analyze(project, [{ file, text: source.replace('endmodule', 'initial $display(unknown_signal); endmodule') }]);
+  assert.ok(bad.diagnostics.some(d => d.message.includes('unknown_signal')));
+  const fixed = await provider.analyze(project, [{ file, text: source }]);
+  assert.ok(!fixed.diagnostics.some(d => d.message.includes('unknown_signal')));
+});

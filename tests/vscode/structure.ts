@@ -1,0 +1,73 @@
+import * as vscode from 'vscode';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { readFile, writeFile, unlink } from 'node:fs/promises';
+import type { DesignHierarchy, HierarchyNode } from '@rtl-dev/semantic';
+
+const flatten = (nodes: HierarchyNode[]): HierarchyNode[] => nodes.flatMap(n => [n, ...flatten(n.children)]);
+export async function testStructure(): Promise<void> {
+  const root = vscode.workspace.workspaceFolders![0].uri.fsPath, manifest = path.join(root, 'rtl.toml');
+  const original = await readFile(manifest, 'utf8');
+  const source = path.join(root, 'rtl/structure_probe.sv'), first = path.join(root, 'tb/structure_first.sv'), second = path.join(root, 'tb/structure_second.sv');
+  const rtl = 'module structure_leaf #(parameter int W=4)(input logic [W-1:0] a, output wire [W-1:0] y);\n timeunit 1ns; timeprecision 1ps; assign y=a; endmodule\nmodule structure_bank #(parameter int W=4, N=2)(input logic [W-1:0] a);\n timeunit 1ns; timeprecision 1ps; for(genvar i=0;i<N;i++) begin:g structure_leaf #(.W(W)) u(.a(a),.y()); end endmodule\n';
+  try {
+    await writeFile(source, rtl);
+    await writeFile(first, 'module structure_top; timeunit 1ns; timeprecision 1ps; logic [3:0] a; structure_bank dut(.*); structure_leaf pair[1:0](.a(a),.y()); endmodule');
+    await writeFile(second, 'module structure_top; timeunit 1ns; timeprecision 1ps; logic [7:0] a; structure_bank #(.W(8),.N(1)) dut(.*); endmodule');
+    await writeFile(manifest, original + '\n[[test]]\nname="structure_first"\ntop="structure_top"\nsources=["tb/structure_first.sv"]\n[[test]]\nname="structure_second"\ntop="structure_top"\nsources=["tb/structure_second.sv"]\n');
+    await new Promise(r => setTimeout(r, 700));
+    const hierarchy = await vscode.commands.executeCommand<DesignHierarchy>('rtl.showStructure', 'structure_first');
+    assert.ok(hierarchy?.roots.length, 'Structure must elaborate in the actual extension host');
+    const nodes = flatten(hierarchy.roots), id = 'structure_top.dut.g[1].u';
+    assert.ok(nodes.some(n => n.id === id));
+    assert.equal(nodes.find(n => n.id === id)?.ports[0].type, 'logic[3:0]');
+    const state=()=>vscode.commands.executeCommand<any>('rtl.getStructure');
+    assert.equal((await state()).inspected,'structure_top');
+    await vscode.commands.executeCommand('rtl.inspectStructure','structure_top.pair[0]');
+    assert.equal((await state()).navigation.parent.id,'structure_top.pair');
+    await vscode.commands.executeCommand('rtl.structureUp');assert.equal((await state()).inspected,'structure_top.pair');
+    assert.equal((await state()).navigation.breadcrumbs.at(-1).kind,'array');
+    await vscode.commands.executeCommand('rtl.inspectStructure','structure_top.dut');
+    await vscode.commands.executeCommand('rtl.inspectStructure', id);
+    let nav=(await state()).navigation;
+    assert.equal(nav.parent.id,'structure_top.dut.g[1]');
+    assert.deepEqual(nav.breadcrumbs.map((n:HierarchyNode)=>n.id),['structure_top','structure_top.dut','structure_top.dut.g','structure_top.dut.g[1]',id]);
+    await vscode.commands.executeCommand('rtl.structureUp');assert.equal((await state()).inspected,'structure_top.dut.g[1]');
+    await vscode.commands.executeCommand('rtl.structureBack');assert.equal((await state()).inspected,id);
+    await vscode.commands.executeCommand('rtl.structureForward');assert.equal((await state()).inspected,'structure_top.dut.g[1]');
+    await vscode.commands.executeCommand('rtl.structureBack');
+    await vscode.commands.executeCommand('rtl.openStructureSource', id, true);
+    let editor = vscode.window.activeTextEditor!;
+    assert.equal(editor.document.uri.fsPath, source); assert.equal(editor.selection.active.line, 0);
+    await vscode.commands.executeCommand('rtl.openStructureSource', id);
+    assert.equal(vscode.window.activeTextEditor!.selection.active.line, 3);
+    const offset = editor.document.getText().indexOf('N=2') + 2;
+    await editor.edit(edit => edit.replace(new vscode.Range(editor.document.positionAt(offset), editor.document.positionAt(offset + 1)), '3'));
+    assert.equal((await vscode.commands.executeCommand<any>('rtl.getStructure')).stale, true);
+    await vscode.commands.executeCommand('rtl.structureBack');
+    assert.equal((await state()).inspected,id,'Stale navigation must not move');
+    const updated = await vscode.commands.executeCommand<DesignHierarchy>('rtl.refreshStructure');
+    assert.ok(updated && flatten(updated.roots).some(n => n.id === 'structure_top.dut.g[2].u'));
+    assert.equal((await state()).inspected,id,'Refresh should preserve an existing inspected path');
+    assert.equal(await readFile(source, 'utf8'), rtl, 'Exploration must not save unsaved RTL');
+    await vscode.commands.executeCommand('rtl.inspectStructure','structure_top.dut.g[2].u');
+    const smaller=editor.document.getText().indexOf('N=3')+2;
+    await editor.edit(edit=>edit.replace(new vscode.Range(editor.document.positionAt(smaller),editor.document.positionAt(smaller+1)),'1'));
+    await vscode.commands.executeCommand('rtl.refreshStructure');
+    assert.equal((await state()).inspected,'structure_top.dut.g','Removed paths must fall back to the real surviving parent');
+    await vscode.commands.executeCommand('rtl.inspectStructure','structure_top.dut.g[0].u');
+    const other = await vscode.commands.executeCommand<DesignHierarchy>('rtl.showStructure', 'structure_second');
+    assert.ok(other); const otherNodes = flatten(other.roots);
+    assert.ok(!otherNodes.some(n => n.id === id));
+    assert.equal(otherNodes.find(n => n.id === 'structure_top.dut.g[0].u')?.ports[0].type, 'logic[7:0]');
+    nav=(await state()).navigation;
+    assert.equal((await state()).inspected,'structure_top','Switching tests must reset even a path present in both graphs');
+    assert.equal(nav.canBack,false);assert.equal((await state()).context.test,'structure_second');
+    await vscode.window.showTextDocument(vscode.Uri.file(source));
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+    console.log('RTL_STRUCTURE_TEST_PASS: context / generate / parameters / diagram creation / source navigation / unsaved refresh / Back Forward Up / surviving parent / context reset');
+  } finally {
+    await writeFile(manifest, original);
+    for (const file of [source, first, second]) await unlink(file);
+  }
+}

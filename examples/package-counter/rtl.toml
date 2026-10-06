@@ -1,0 +1,23 @@
+version = 1
+[project]
+name = "package-counter"
+[sources]
+packages = ["rtl/counter_pkg.sv", "rtl/width_pkg.sv", "rtl/base_pkg.sv"]
+package_order = "auto"
+rtl = ["rtl/counter.sv"]
+[simulation]
+backend = "verilator"
+timing = true
+jobs = 2
+waveform = "vcd"
+timeout_ms = 60000
+[[test]]
+name = "counter_basic"
+tags = ["smoke", "basic"]
+top = "counter_basic_tb"
+sources = ["tb/counter_basic_tb.sv"]
+[[test]]
+name = "counter_reset"
+tags = ["smoke", "reset"]
+top = "counter_reset_tb"
+sources = ["tb/counter_reset_tb.sv"]

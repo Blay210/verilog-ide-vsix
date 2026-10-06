@@ -1,0 +1,15 @@
+{
+  "name": "@rtl-dev/cli",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "rtl": "dist/cli.cjs"
+  },
+  "dependencies": {
+    "@rtl-dev/core": "0.1.0",
+    "@rtl-dev/verilator": "0.1.0",
+    "@rtl-dev/toolchain": "0.1.0",
+    "@rtl-dev/semantic": "0.1.0",
+    "@rtl-dev/waveform": "0.1.0"
+  }
+}

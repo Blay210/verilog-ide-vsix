@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "RTL Dev Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "preLaunchTask": "RTL: Build development host",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode",
+        "${workspaceFolder}/examples/counter"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/vscode/dist/**/*.cjs"]
+    }
+  ]
+}

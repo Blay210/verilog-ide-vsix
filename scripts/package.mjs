@@ -1,0 +1,24 @@
+import './build.mjs';
+import './third-party-notices.mjs';
+import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { createVSIX } from '@vscode/vsce';
+import path from 'node:path';
+await mkdir('dist', { recursive: true });
+await copyFile('docs/private-beta-guide.md', 'packages/vscode/README.md');
+await copyFile('LICENSE', 'packages/vscode/LICENSE');
+const { version } = JSON.parse(await readFile('packages/vscode/package.json', 'utf8'));
+await createVSIX({ cwd: 'packages/vscode', packagePath: path.resolve(`dist/rtl-dev-${version}.vsix`), dependencies: false, allowMissingRepository: true, rewriteRelativeLinks: false });
+const bundle = path.resolve(`dist/private-beta-${version}`);
+await mkdir(path.join(bundle, 'cli'), { recursive: true });
+await copyFile(`dist/rtl-dev-${version}.vsix`, path.join(bundle, `rtl-dev-${version}.vsix`));
+await copyFile('docs/private-beta-guide.md', path.join(bundle, 'START-HERE.md'));
+await copyFile('LICENSE', path.join(bundle, 'LICENSE'));
+await copyFile('packages/vscode/THIRD-PARTY-NOTICES.txt', path.join(bundle, 'THIRD-PARTY-NOTICES.txt'));
+await copyFile('packages/cli/dist/cli.cjs', path.join(bundle, 'cli/rtl.cjs'));
+await copyFile('packages/cli/dist/analyze.py', path.join(bundle, 'cli/analyze.py'));
+// Generate a pristine example; never ship the user's modified examples/counter.
+const { createRequire } = await import('node:module');
+const { createProject } = createRequire(import.meta.url)('../packages/core/dist/index.js');
+await createProject(path.join(bundle, 'counter-example'), true);
+await writeFile(path.join(bundle, 'release-info.json'), JSON.stringify({ version, channel: 'private-beta', independentIde: false, platform: 'Windows x64', packagedAt: new Date().toISOString() }, null, 2));
+console.log('Private beta bundle:', bundle);

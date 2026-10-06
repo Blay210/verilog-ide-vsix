@@ -1,0 +1,1 @@
+{"name":"@rtl-dev/language-server","version":"0.1.0","private":true,"main":"dist/server.cjs","dependencies":{"@rtl-dev/core":"0.1.0","@rtl-dev/semantic":"0.1.0","vscode-languageserver":"9.0.1","vscode-languageserver-textdocument":"1.0.12"}}

@@ -1,0 +1,20 @@
+version = 1
+[project]
+name = "hierarchy"
+[sources]
+rtl = ["rtl/*.sv"]
+[simulation]
+backend = "verilator"
+timing = true
+waveform = "vcd"
+jobs = 2
+[[test]]
+name = "narrow"
+top = "narrow_tb"
+sources = ["tb/narrow_tb.sv"]
+tags = ["smoke"]
+[[test]]
+name = "wide"
+top = "wide_tb"
+sources = ["tb/wide_tb.sv"]
+tags = ["smoke"]

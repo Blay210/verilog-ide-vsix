@@ -1,0 +1,1 @@
+{"name":"@rtl-dev/core","version":"0.1.0","private":true,"main":"dist/index.js","types":"src/index.ts","dependencies":{"smol-toml":"^1.4.0","fast-glob":"^3.3.3","zod":"^3.25.0"}}

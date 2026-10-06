@@ -1,0 +1,37 @@
+{
+  "name": "rtl-dev-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:integration": "tsx --test tests/integration/*.test.ts",
+    "test:vscode": "node scripts/test-vscode.mjs",
+    "test:vscode:tools": "node scripts/test-vscode-tools.mjs",
+    "package": "node scripts/package.mjs",
+    "test:semantic": "tsx --test tests/semantic/*.test.ts",
+    "verify:waveform-scale": "node scripts/verify-waveform-scale.mjs",
+    "verify:waveform-lifecycle": "node --expose-gc scripts/verify-waveform-lifecycle.mjs",
+    "profile:waveform-parser": "node --expose-gc scripts/profile-waveform-parser.mjs",
+    "compare:waveform-values": "node --expose-gc scripts/compare-waveform-values.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "jsonc-parser": "^3.3.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  }
+}

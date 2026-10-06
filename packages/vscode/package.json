@@ -1,0 +1,522 @@
+{
+  "name": "rtl-dev",
+  "displayName": "RTL Dev",
+  "description": "Source-first Verilog/SystemVerilog projects, simulation, toolchain setup and waveforms.",
+  "version": "0.3.1",
+  "publisher": "rtl-dev-local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Testing"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "workspaceContains:rtl.toml",
+    "onLanguage:verilog",
+    "onLanguage:systemverilog"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Project execution and tool installation require workspace trust."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "configuration": {
+      "title": "RTL Dev",
+      "properties": {
+        "rtl.toolsDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "Shared tool storage folder. Leave empty for ~/.rtl-dev or RTL_DEV_HOME. On Windows choose a short ASCII path without spaces."
+        },
+        "rtl.editor.autoCloseBlocks": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "On Enter after begin or case (...), indent the body and insert a missing end/endcase."
+        },
+        "rtl.editor.basicCompletions": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Suggest RTL keywords, gate primitives and common system tasks/functions."
+        },
+        "rtl.editor.semantic": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Enable slang module/port intelligence and diagnostics. Requires approved language tool installation and a trusted workspace."
+        },
+        "rtl.waveform.viewer": {
+          "type": "string",
+          "enum": [
+            "internal",
+            "external"
+          ],
+          "default": "internal",
+          "description": "Open VCD results in the built-in viewer or GTKWave. FST uses GTKWave."
+        },
+        "rtl.editor.templates": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Expand explicit RTL block keywords with Tab and offer templates with tab stops."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "verilog",
+        "extensions": [
+          ".v",
+          ".vh"
+        ],
+        "aliases": [
+          "Verilog"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/verilog-light.svg",
+          "dark": "./icons/verilog-dark.svg"
+        }
+      },
+      {
+        "id": "systemverilog",
+        "extensions": [
+          ".sv",
+          ".svh"
+        ],
+        "aliases": [
+          "SystemVerilog"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/systemverilog-light.svg",
+          "dark": "./icons/systemverilog-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "verilog",
+        "scopeName": "source.verilog",
+        "path": "./syntaxes/verilog.tmLanguage.json"
+      },
+      {
+        "language": "systemverilog",
+        "scopeName": "source.systemverilog",
+        "path": "./syntaxes/systemverilog.tmLanguage.json"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "rtl.runCurrent",
+        "key": "f5",
+        "when": "editorTextFocus && rtl.currentTestbench && (editorLangId == verilog || editorLangId == systemverilog)"
+      },
+      {
+        "command": "rtl.insertNewline",
+        "key": "enter",
+        "when": "editorTextFocus && !editorReadonly && (!suggestWidgetVisible || rtl.blockEnter) && (!inSnippetMode || rtl.beginPair) && !editorHasMultipleSelections && config.rtl.editor.autoCloseBlocks && (editorLangId == verilog || editorLangId == systemverilog)"
+      },
+      {
+        "command": "rtl.expandTemplate",
+        "key": "tab",
+        "when": "editorTextFocus && !editorReadonly && !editorTabMovesFocus && !inSnippetMode && !inlineSuggestionVisible && !editorHasMultipleSelections && rtl.templateTab && config.rtl.editor.templates && (editorLangId == verilog || editorLangId == systemverilog)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "rtl.runTarget",
+        "title": "RTL: Run Chosen Test",
+        "icon": "$(play)"
+      },
+      {
+        "command": "rtl.selectTarget",
+        "title": "RTL: Choose Test Target"
+      },
+      {
+        "command": "rtl.latestResult",
+        "title": "RTL: Last Result Actions"
+      },
+      {
+        "command": "rtl.createExample",
+        "title": "RTL: Create Counter Example"
+      },
+      {
+        "command": "rtl.createProject",
+        "title": "RTL: Create Minimal Project"
+      },
+      {
+        "command": "rtl.refresh",
+        "title": "RTL: Refresh Tests",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "rtl.runAll",
+        "title": "RTL: Run All Tests",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "rtl.runSelected",
+        "title": "RTL: Run Selected Tests",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "rtl.runCurrent",
+        "title": "RTL: Run Current Testbench",
+        "icon": "$(play)"
+      },
+      {
+        "command": "rtl.toolchain",
+        "title": "RTL: Toolchain",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "rtl.resultActions",
+        "title": "RTL: Test Result Actions"
+      },
+      {
+        "command": "rtl.setupLanguage",
+        "title": "RTL: Set Up Language Support",
+        "icon": "$(symbol-keyword)"
+      },
+      {
+        "command": "rtl.restartLanguage",
+        "title": "RTL: Restart Language Server"
+      },
+      {
+        "command": "rtl.runTag",
+        "title": "RTL: Run Tests by Tag"
+      },
+      {
+        "command": "rtl.history",
+        "title": "RTL: Show Run History",
+        "icon": "$(history)"
+      },
+      {
+        "command": "rtl.showStructure",
+        "title": "RTL: Explore Design Structure",
+        "icon": "$(symbol-class)"
+      },
+      {
+        "command": "rtl.refreshStructure",
+        "title": "RTL: Refresh Design Structure",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "rtl.openStructureSource",
+        "title": "Open Instance Source"
+      },
+      {
+        "command": "rtl.openStructureDefinition",
+        "title": "Open Module Definition"
+      },
+      {
+        "command": "rtl.openWaveform",
+        "title": "RTL: Open Waveform",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "rtl.openWaveformExternal",
+        "title": "RTL: Open Waveform in GTKWave"
+      },
+      {
+        "command": "rtl.stopSimulation",
+        "title": "RTL: Stop Simulation",
+        "icon": "$(debug-stop)",
+        "enablement": "rtl.simulating"
+      },
+      {
+        "command": "rtl.resultLog",
+        "title": "Open Test Log",
+        "icon": "$(output)"
+      },
+      {
+        "command": "rtl.resultWaveform",
+        "title": "Open Test Waveform",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "rtl.resultRerun",
+        "title": "Re-run Test",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "rtl.languageStatus",
+        "title": "RTL: Language Status"
+      },
+      {
+        "command": "rtl.structureBack",
+        "title": "RTL: Back in Structure",
+        "icon": "$(arrow-left)",
+        "enablement": "rtl.structureCanBack"
+      },
+      {
+        "command": "rtl.structureForward",
+        "title": "RTL: Forward in Structure",
+        "icon": "$(arrow-right)",
+        "enablement": "rtl.structureCanForward"
+      },
+      {
+        "command": "rtl.structureUp",
+        "title": "RTL: Up in Structure",
+        "icon": "$(arrow-up)",
+        "enablement": "rtl.structureCanUp"
+      },
+      {
+        "command": "rtl.runFile",
+        "title": "Run RTL Testbench",
+        "icon": "$(play)",
+        "enablement": "!rtl.simulating"
+      },
+      {
+        "command": "rtl.runSimulationTest",
+        "title": "Run Test",
+        "icon": "$(play)",
+        "enablement": "!rtl.simulating"
+      },
+      {
+        "command": "rtl.runSimulationSelection",
+        "title": "Run Selected Tests",
+        "icon": "$(checklist)",
+        "enablement": "!rtl.simulating"
+      },
+      {
+        "command": "rtl.openSimulationSource",
+        "title": "Open Testbench Source",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "rtl.openSimulationWaveform",
+        "title": "Open Latest Test Waveform",
+        "icon": "$(pulse)"
+      }
+    ],
+    "views": {
+      "rtl-simulation": [
+        {
+          "id": "rtl.start",
+          "name": "Tests"
+        },
+        {
+          "id": "rtl.results",
+          "name": "Run History"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "rtl.hierarchy",
+          "name": "RTL Hierarchy"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "rtl.hierarchy",
+        "contents": "Choose a test context to explore its elaborated RTL structure.\n[Explore Design Structure](command:rtl.showStructure)"
+      },
+      {
+        "view": "rtl.start",
+        "contents": "Open a folder with rtl.toml to load simulation targets.\n[Create Minimal Project](command:rtl.createProject)\n[Create Counter Example](command:rtl.createExample)\n[Simulation Tools](command:rtl.toolchain)\n[Language Support](command:rtl.setupLanguage)"
+      },
+      {
+        "view": "rtl.results",
+        "contents": "Run a test to see its logs and waveform here."
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "rtl.showStructure",
+          "when": "view == rtl.hierarchy",
+          "group": "navigation"
+        },
+        {
+          "command": "rtl.refreshStructure",
+          "when": "view == rtl.hierarchy",
+          "group": "navigation"
+        },
+        {
+          "command": "rtl.runAll",
+          "when": "view == rtl.start || view == rtl.results",
+          "group": "navigation"
+        },
+        {
+          "command": "rtl.stopSimulation",
+          "when": "view == rtl.start || view == rtl.results",
+          "group": "navigation"
+        },
+        {
+          "command": "rtl.structureBack",
+          "when": "view == rtl.hierarchy",
+          "group": "navigation@3"
+        },
+        {
+          "command": "rtl.structureForward",
+          "when": "view == rtl.hierarchy",
+          "group": "navigation@4"
+        },
+        {
+          "command": "rtl.structureUp",
+          "when": "view == rtl.hierarchy",
+          "group": "navigation@5"
+        },
+        {
+          "command": "rtl.runSimulationSelection",
+          "when": "view == rtl.start",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rtl.toolchain",
+          "when": "view == rtl.start",
+          "group": "settings"
+        },
+        {
+          "command": "rtl.setupLanguage",
+          "when": "view == rtl.start",
+          "group": "settings"
+        },
+        {
+          "command": "rtl.languageStatus",
+          "when": "view == rtl.start",
+          "group": "settings"
+        },
+        {
+          "command": "rtl.refresh",
+          "when": "view == rtl.start",
+          "group": "settings"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "rtl.openStructureSource",
+          "when": "view == rtl.hierarchy && viewItem == rtlHierarchyNode"
+        },
+        {
+          "command": "rtl.openStructureDefinition",
+          "when": "view == rtl.hierarchy && viewItem == rtlHierarchyNode"
+        },
+        {
+          "command": "rtl.resultLog",
+          "when": "view == rtl.results && (viewItem == rtlResult || viewItem == rtlResultWaveform)",
+          "group": "inline"
+        },
+        {
+          "command": "rtl.resultWaveform",
+          "when": "view == rtl.results && viewItem == rtlResultWaveform",
+          "group": "inline"
+        },
+        {
+          "command": "rtl.resultRerun",
+          "when": "view == rtl.results && (viewItem == rtlResult || viewItem == rtlResultWaveform)",
+          "group": "inline"
+        },
+        {
+          "command": "rtl.runSimulationTest",
+          "when": "view == rtl.start && (viewItem == rtlSimulationTest || viewItem == rtlSimulationWaveform)",
+          "group": "inline@1"
+        },
+        {
+          "command": "rtl.openSimulationSource",
+          "when": "view == rtl.start && (viewItem == rtlSimulationTest || viewItem == rtlSimulationWaveform)",
+          "group": "inline@3"
+        },
+        {
+          "command": "rtl.openSimulationWaveform",
+          "when": "view == rtl.start && viewItem == rtlSimulationWaveform",
+          "group": "inline@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "rtl.openWaveform",
+          "when": "resourceExtname == .vcd || resourceExtname == .fst",
+          "group": "navigation"
+        },
+        {
+          "command": "rtl.runFile",
+          "when": "resourceScheme == file && !explorerResourceIsFolder && resource in rtl.testbenchUris",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "rtl.runFile",
+          "when": "resourceScheme == file && resource in rtl.testbenchUris",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "rtl.selectTarget",
+          "when": "false"
+        },
+        {
+          "command": "rtl.resultLog",
+          "when": "false"
+        },
+        {
+          "command": "rtl.resultWaveform",
+          "when": "false"
+        },
+        {
+          "command": "rtl.resultRerun",
+          "when": "false"
+        },
+        {
+          "command": "rtl.runFile",
+          "when": "false"
+        },
+        {
+          "command": "rtl.runSimulationTest",
+          "when": "false"
+        },
+        {
+          "command": "rtl.openSimulationSource",
+          "when": "false"
+        },
+        {
+          "command": "rtl.openSimulationWaveform",
+          "when": "false"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "rtl.waveform",
+        "displayName": "RTL Waveform",
+        "selector": [
+          {
+            "filenamePattern": "*.vcd"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "rtl-simulation",
+          "title": "Simulation",
+          "icon": "icons/simulation.svg"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@rtl-dev/core": "0.1.0",
+    "@rtl-dev/verilator": "0.1.0",
+    "@rtl-dev/toolchain": "0.1.0",
+    "@rtl-dev/language": "0.1.0",
+    "vscode-languageclient": "9.0.1",
+    "@rtl-dev/semantic": "0.1.0",
+    "@rtl-dev/waveform": "0.1.0"
+  }
+}

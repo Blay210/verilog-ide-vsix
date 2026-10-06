@@ -1,0 +1,15 @@
+{
+  "name": "Verilog", "scopeName": "source.verilog",
+  "patterns": [
+    {"name":"comment.line.double-slash.verilog","begin":"//","end":"$"},
+    {"name":"comment.block.verilog","begin":"/\\*","end":"\\*/"},
+    {"name":"string.quoted.double.verilog","begin":"\"","end":"\"","patterns":[{"name":"constant.character.escape.verilog","match":"\\\\."}]},
+    {"name":"variable.other.verilog","match":"\\\\\\S+"},
+    {"name":"meta.preprocessor.verilog","match":"`[A-Za-z_][A-Za-z0-9_$]*"},
+    {"name":"support.function.verilog","match":"\\$[A-Za-z_][A-Za-z0-9_$]*"},
+    {"name":"constant.numeric.verilog","match":"\\b[0-9][0-9_]*(?:'[sS]?[bBoOdDhH][0-9a-fA-F_xXzZ?]+|\\.[0-9_]+(?:[eE][+-]?[0-9_]+)?)?\\b|'[01xXzZ]"},
+    {"name":"keyword.control.verilog","match":"\\b(?:always|always_comb|always_ff|always_latch|assign|begin|case|casex|casez|default|else|end|endcase|endclass|endfunction|endgenerate|endinterface|endmodule|endpackage|endprogram|endtask|for|foreach|forever|fork|generate|if|initial|join|join_any|join_none|negedge|posedge|repeat|return|unique|priority|wait|while|assert|cover|final)\\b"},
+    {"name":"storage.type.verilog","match":"\\b(?:module|package|interface|function|task|class|program|wire|reg|logic|bit|byte|int|integer|longint|shortint|time|real|realtime|shortreal|string|struct|enum|union|typedef|genvar|event|input|output|inout|parameter|localparam|signed|unsigned|automatic|static|const|void|import|packed)\\b"},
+    {"name":"support.type.verilog","match":"\\b(?:and|nand|nor|not|or|xor|xnor|buf|bufif0|bufif1|notif0|notif1)\\b"}
+  ]
+}

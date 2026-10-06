@@ -1,0 +1,11 @@
+{
+  "name": "@rtl-dev/semantic",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@rtl-dev/core": "0.1.0",
+    "@rtl-dev/language": "0.1.0"
+  }
+}

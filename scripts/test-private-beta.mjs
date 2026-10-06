@@ -1,0 +1,20 @@
+import { build } from 'esbuild';
+import { mkdir, mkdtemp } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+
+const code = process.env.VSCODE_EXECUTABLE;
+const installed = process.env.RTL_INSTALLED_EXTENSION;
+if (!code || !installed) throw Error('Set VSCODE_EXECUTABLE and RTL_INSTALLED_EXTENSION to the isolated VSIX installation.');
+await mkdir('.dev/package-tests', { recursive: true });
+const root = await mkdtemp(path.resolve('.dev/package-tests/final-'));
+const { createProject } = createRequire(import.meta.url)('../packages/core/dist/index.js');
+await createProject(path.join(root, 'project'), true);
+const suite = path.join(root, 'suite.cjs');
+await build({ entryPoints: ['tests/vscode/package-smoke.ts'], bundle: true, platform: 'node', format: 'cjs', external: ['vscode'], outfile: suite });
+const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+console.log('Package verification root:', root);
+const child = spawn(code, [path.join(root, 'project'), '--new-window', '--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--user-data-dir', path.join(root, 'profile'), '--extensions-dir', path.join(root, 'extensions'), '--extensionDevelopmentPath=' + path.resolve(installed), '--extensionTestsPath=' + suite], { env, stdio: 'inherit' });
+child.on('error', error => { console.error(error); process.exitCode = 1; });
+child.on('exit', code => { process.exitCode = code ?? 1; });
